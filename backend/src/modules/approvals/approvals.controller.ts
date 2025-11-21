@@ -1,13 +1,12 @@
 import { Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { AuthRequest } from '../../middleware/auth';
 import { sendReservationQRs } from '../../utils/emailService';
-
-const prisma = new PrismaClient();
+import prisma from '../../utils/prisma';
+import { ApprovalWhereInput } from '../../types';
 
 export const getPendingApprovals = async (req: AuthRequest, res: Response) => {
   try {
-    let where: any = {
+    let where: ApprovalWhereInput = {
       status: 'PENDING'
     };
 

@@ -1,20 +1,23 @@
 import nodemailer from 'nodemailer';
 import QRCode from 'qrcode';
+import { env } from './env';
+import logger from './logger';
+import { ReservationDetailsForEmail, GuestWithQR } from '../types';
 
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: process.env.SMTP_SECURE === 'true',
+  host: env.smtp.host,
+  port: env.smtp.port,
+  secure: env.smtp.secure,
   auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS
+    user: env.smtp.user,
+    pass: env.smtp.pass
   }
 });
 
 export const sendReservationQRs = async (
   relatorEmail: string,
   relatorName: string,
-  guests: Array<{ name: string; qrCode: string }>,
+  guests: GuestWithQR[],
   eventName: string,
   eventDate: string
 ) => {
@@ -101,18 +104,28 @@ export const sendReservationQRs = async (
     </html>
   `;
 
-  await transporter.sendMail({
-    from: process.env.EMAIL_FROM,
-    to: relatorEmail,
-    subject: `✅ Reserva Confirmada - ${eventName}`,
-    html
-  });
+  try {
+    await transporter.sendMail({
+      from: env.emailFrom,
+      to: relatorEmail,
+      subject: `✅ Reserva Confirmada - ${eventName}`,
+      html
+    });
+    logger.info(`Email de confirmación enviado a ${relatorEmail}`);
+  } catch (error) {
+    logger.error('Error enviando email de confirmación de reserva:', {
+      error,
+      relatorEmail,
+      eventName
+    });
+    throw new Error(`Error enviando email de confirmación: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+  }
 };
 
 export const sendApprovalRequest = async (
   approverEmail: string,
   approverName: string,
-  reservationDetails: any
+  reservationDetails: ReservationDetailsForEmail
 ) => {
   const html = `
     <h1>Nueva Solicitud de Aprobación</h1>
@@ -128,10 +141,20 @@ export const sendApprovalRequest = async (
     <p>Ingresa al sistema para revisar y aprobar esta solicitud.</p>
   `;
 
-  await transporter.sendMail({
-    from: process.env.EMAIL_FROM,
-    to: approverEmail,
-    subject: '🔔 Nueva Solicitud de Aprobación de Reserva',
-    html
-  });
+  try {
+    await transporter.sendMail({
+      from: env.emailFrom,
+      to: approverEmail,
+      subject: '🔔 Nueva Solicitud de Aprobación de Reserva',
+      html
+    });
+    logger.info(`Email de solicitud de aprobación enviado a ${approverEmail}`);
+  } catch (error) {
+    logger.error('Error enviando email de solicitud de aprobación:', {
+      error,
+      approverEmail,
+      reservationDetails
+    });
+    throw new Error(`Error enviando email de aprobación: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+  }
 };

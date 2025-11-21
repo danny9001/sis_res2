@@ -1,16 +1,15 @@
 import { Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { AuthRequest } from '../../middleware/auth';
 import { v4 as uuidv4 } from 'uuid';
 import { sendApprovalRequest } from '../../utils/emailService';
-
-const prisma = new PrismaClient();
+import prisma from '../../utils/prisma';
+import { ReservationWhereInput, GuestCreateInput } from '../../types';
 
 export const getReservations = async (req: AuthRequest, res: Response) => {
   try {
     const { eventId, status, relatorId } = req.query;
 
-    const where: any = {};
+    const where: ReservationWhereInput = {};
 
     if (eventId) {
       where.eventId = eventId;
@@ -199,80 +198,94 @@ export const createReservation = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: 'Sector no encontrado' });
     }
 
-    // Crear reserva
-    const reservation = await prisma.reservation.create({
-      data: {
-        eventId,
-        sectorId,
-        tableType,
-        tableClass,
-        paymentType,
-        paymentAmount,
-        relatorMainId: req.user!.id,
-        relatorMainPhone,
-        relatorSaleId,
-        relatorSalePhone,
-        responsibleName,
-        responsiblePhone,
-        notes,
-        status: sector.requiresApproval ? 'PENDING' : 'APPROVED',
-        guests: {
-          create: guests.map((guest: any) => ({
-            name: guest.name,
-            ci: guest.ci,
-            phone: guest.phone,
-            email: guest.email,
-            birthDate: guest.birthDate ? new Date(guest.birthDate) : null,
-            qrCode: uuidv4()
-          }))
-        }
-      },
-      include: {
-        event: true,
-        sector: true,
-        relatorMain: true,
-        guests: true
-      }
-    });
-
-    // Crear registro de auditoría
-    await prisma.auditLog.create({
-      data: {
-        userId: req.user!.id,
-        action: 'CREATE_RESERVATION',
-        entity: 'Reservation',
-        entityId: reservation.id,
-        reservationId: reservation.id,
-        newData: reservation as any,
-        ipAddress: req.ip,
-        userAgent: req.get('user-agent')
-      }
-    });
-
-    // Si requiere aprobación, crear solicitud y notificar
-    if (sector.requiresApproval && sector.approvers.length > 0) {
-      // Crear aprobación con el primer aprobador
-      const firstApprover = sector.approvers[0].approver;
-      
-      await prisma.approval.create({
+    // Crear reserva dentro de una transacción
+    const reservation = await prisma.$transaction(async (tx) => {
+      // Crear reserva
+      const newReservation = await tx.reservation.create({
         data: {
-          reservationId: reservation.id,
-          approverId: firstApprover.id,
-          status: 'PENDING'
+          eventId,
+          sectorId,
+          tableType,
+          tableClass,
+          paymentType,
+          paymentAmount,
+          relatorMainId: req.user!.id,
+          relatorMainPhone,
+          relatorSaleId,
+          relatorSalePhone,
+          responsibleName,
+          responsiblePhone,
+          notes,
+          status: sector.requiresApproval ? 'PENDING' : 'APPROVED',
+          guests: {
+            create: (guests as GuestCreateInput[]).map((guest) => ({
+              name: guest.name,
+              ci: guest.ci,
+              phone: guest.phone,
+              email: guest.email,
+              birthDate: guest.birthDate ? new Date(guest.birthDate) : null,
+              qrCode: uuidv4()
+            }))
+          }
+        },
+        include: {
+          event: true,
+          sector: true,
+          relatorMain: true,
+          guests: true
         }
       });
 
-      // Enviar email de notificación
-      await sendApprovalRequest(
-        firstApprover.email,
-        firstApprover.name,
-        {
-          eventName: event.name,
-          sectorName: sector.name,
-          relatorName: req.user!.name,
-          tableType
+      // Crear registro de auditoría
+      await tx.auditLog.create({
+        data: {
+          userId: req.user!.id,
+          action: 'CREATE_RESERVATION',
+          entity: 'Reservation',
+          entityId: newReservation.id,
+          reservationId: newReservation.id,
+          newData: newReservation as any,
+          ipAddress: req.ip,
+          userAgent: req.get('user-agent')
         }
-      );
+      });
+
+      // Si requiere aprobación, crear solicitud
+      if (sector.requiresApproval && sector.approvers.length > 0) {
+        const firstApprover = sector.approvers[0].approver;
+
+        await tx.approval.create({
+          data: {
+            reservationId: newReservation.id,
+            approverId: firstApprover.id,
+            status: 'PENDING'
+          }
+        });
+      }
+
+      return newReservation;
+    });
+
+    // Enviar notificaciones después de la transacción exitosa
+    if (sector.requiresApproval && sector.approvers.length > 0) {
+      const firstApprover = sector.approvers[0].approver;
+
+      try {
+        // Enviar email de notificación
+        await sendApprovalRequest(
+          firstApprover.email,
+          firstApprover.name,
+          {
+            eventName: event.name,
+            sectorName: sector.name,
+            relatorName: req.user!.name,
+            tableType
+          }
+        );
+      } catch (emailError) {
+        console.error('Error enviando email de aprobación:', emailError);
+        // No falla la operación si el email falla
+      }
 
       // Notificar via WebSocket
       const io = req.app.get('io');

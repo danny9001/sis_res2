@@ -1,8 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { PrismaClient, UserRole } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { UserRole } from '@prisma/client';
+import prisma from '../utils/prisma';
+import { env } from '../utils/env';
+import { JwtPayload } from '../types';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -24,7 +25,7 @@ export const authenticate = async (
       return res.status(401).json({ error: 'No autorizado' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
+    const decoded = jwt.verify(token, env.jwtSecret) as JwtPayload;
     
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },

@@ -4,9 +4,11 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import dotenv from 'dotenv';
+import { validateEnv, env } from './utils/env';
 import { errorHandler } from './middleware/errorHandler';
 import { notFoundHandler } from './middleware/notFoundHandler';
+import { apiLimiter } from './middleware/rateLimiter';
+import logger, { morganStream } from './utils/logger';
 import authRoutes from './modules/auth/auth.routes';
 import userRoutes from './modules/users/users.routes';
 import sectorRoutes from './modules/sectors/sectors.routes';
@@ -17,13 +19,14 @@ import guestRoutes from './modules/invitations/guests.routes';
 import analyticsRoutes from './modules/analytics/analytics.routes';
 import auditRoutes from './modules/audit/audit.routes';
 
-dotenv.config();
+// Validar variables de entorno al inicio
+validateEnv();
 
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: env.frontendUrl,
     methods: ['GET', 'POST']
   }
 });
@@ -31,21 +34,56 @@ const io = new Server(httpServer, {
 // Middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: env.frontendUrl,
   credentials: true
 }));
-app.use(morgan('dev'));
+app.use(morgan('combined', { stream: morganStream }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Rate limiting
+app.use('/api', apiLimiter);
 
 // Socket.io
 app.set('io', io);
 
+io.use(async (socket, next) => {
+  try {
+    const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.replace('Bearer ', '');
+
+    if (!token) {
+      return next(new Error('No autorizado - Token requerido'));
+    }
+
+    const jwt = await import('jsonwebtoken');
+    const decoded = jwt.verify(token, env.jwtSecret) as any;
+
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: { id: true, email: true, role: true, active: true }
+    });
+
+    await prisma.$disconnect();
+
+    if (!user || !user.active) {
+      return next(new Error('Usuario no válido'));
+    }
+
+    socket.data.user = user;
+    next();
+  } catch (error) {
+    next(new Error('Token inválido'));
+  }
+});
+
 io.on('connection', (socket) => {
-  console.log('Cliente conectado:', socket.id);
-  
+  logger.info(`Cliente conectado: ${socket.id} - Usuario: ${socket.data.user?.email}`);
+
   socket.on('disconnect', () => {
-    console.log('Cliente desconectado:', socket.id);
+    logger.info(`Cliente desconectado: ${socket.id}`);
   });
 });
 
@@ -68,11 +106,9 @@ app.use('/api/audit', auditRoutes);
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 3001;
-
-httpServer.listen(PORT, () => {
-  console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
-  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+httpServer.listen(env.port, () => {
+  logger.info(`🚀 Servidor corriendo en puerto ${env.port}`);
+  logger.info(`📊 Environment: ${env.nodeEnv}`);
 });
 
 export { io };
