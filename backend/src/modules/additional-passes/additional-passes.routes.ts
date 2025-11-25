@@ -48,3 +48,24 @@ passesRouter.get(
 );
 
 // Detalles de un pase
+passesRouter.get(
+  '/:id',
+  authorize(['ADMIN', 'APPROVER', 'RELATOR', 'VALIDATOR']),
+  getAdditionalPass
+);
+
+// QR de un pase
+passesRouter.get(
+  '/:id/qr',
+  authorize(['ADMIN', 'APPROVER', 'RELATOR', 'VALIDATOR']),
+  getPassQR
+);
+
+// Revocar pase
+passesRouter.post(
+  '/:id/revoke',
+  authorize(['ADMIN', 'APPROVER']),
+  revokeAdditionalPass
+);
+
+export default passesRouter;

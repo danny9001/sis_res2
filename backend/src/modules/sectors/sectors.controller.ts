@@ -46,14 +46,10 @@ export const getSectors = async (req: Request, res: Response) => {
       where,
       include: {
         approvers: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-              },
-            },
+          select: {
+            id: true,
+            name: true,
+            email: true,
           },
         },
         _count: {
@@ -86,15 +82,11 @@ export const getSector = async (req: Request, res: Response) => {
       where: { id },
       include: {
         approvers: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                phone: true,
-              },
-            },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
           },
         },
         reservations: {
@@ -159,7 +151,7 @@ export const createSector = async (req: Request, res: Response) => {
         action: 'CREATE_SECTOR',
         entity: 'Sector',
         entityId: sector.id,
-        newData: data,
+        changes: JSON.stringify({ newData: data }),
       },
     });
 
@@ -218,8 +210,7 @@ export const updateSector = async (req: Request, res: Response) => {
         action: 'UPDATE_SECTOR',
         entity: 'Sector',
         entityId: id,
-        oldData: existing,
-        newData: data,
+        changes: JSON.stringify({ oldData: existing, newData: data }),
       },
     });
 
@@ -282,7 +273,7 @@ export const deleteSector = async (req: Request, res: Response) => {
         action: 'DELETE_SECTOR',
         entity: 'Sector',
         entityId: id,
-        oldData: sector,
+        changes: JSON.stringify({ oldData: sector }),
       },
     });
 
@@ -319,29 +310,28 @@ export const addApprover = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'El usuario debe tener rol APPROVER' });
     }
 
-    // Verificar que no exista ya
-    const existing = await prisma.sectorApprover.findFirst({
-      where: {
-        sectorId: id,
-        userId: approverId,
-      },
+    // Verificar que el sector existe
+    const sector = await prisma.sector.findUnique({
+      where: { id },
+      include: { approvers: true },
     });
 
-    if (existing) {
+    if (!sector) {
+      return res.status(404).json({ error: 'Sector no encontrado' });
+    }
+
+    // Verificar que no exista ya
+    const alreadyAssigned = sector.approvers.some(a => a.id === approverId);
+    if (alreadyAssigned) {
       return res.status(400).json({ error: 'El aprobador ya está asignado' });
     }
 
-    const assignment = await prisma.sectorApprover.create({
+    // Asignar aprobador usando connect
+    await prisma.sector.update({
+      where: { id },
       data: {
-        sectorId: id,
-        userId: approverId,
-      },
-      include: {
-        user: {
-          select: {
-            name: true,
-            email: true,
-          },
+        approvers: {
+          connect: { id: approverId },
         },
       },
     });
@@ -351,19 +341,24 @@ export const addApprover = async (req: Request, res: Response) => {
       data: {
         userId: currentUserId,
         action: 'ADD_SECTOR_APPROVER',
-        entity: 'SectorApprover',
-        entityId: assignment.id,
-        newData: {
+        entity: 'Sector',
+        entityId: id,
+        changes: JSON.stringify({
           sectorId: id,
           approverId,
-        },
+          approverName: approver.name,
+        }),
       },
     });
 
     res.status(201).json({
       success: true,
       message: 'Aprobador asignado correctamente',
-      assignment,
+      approver: {
+        id: approver.id,
+        name: approver.name,
+        email: approver.email,
+      },
     });
   } catch (error) {
     console.error('Error al asignar aprobador:', error);
@@ -380,19 +375,29 @@ export const removeApprover = async (req: Request, res: Response) => {
     const { id, approverId } = req.params;
     const userId = req.user!.id;
 
-    const assignment = await prisma.sectorApprover.findFirst({
-      where: {
-        sectorId: id,
-        userId: approverId,
-      },
+    // Verificar que el sector existe y tiene este aprobador
+    const sector = await prisma.sector.findUnique({
+      where: { id },
+      include: { approvers: true },
     });
 
-    if (!assignment) {
+    if (!sector) {
+      return res.status(404).json({ error: 'Sector no encontrado' });
+    }
+
+    const approverExists = sector.approvers.some(a => a.id === approverId);
+    if (!approverExists) {
       return res.status(404).json({ error: 'Asignación no encontrada' });
     }
 
-    await prisma.sectorApprover.delete({
-      where: { id: assignment.id },
+    // Remover aprobador usando disconnect
+    await prisma.sector.update({
+      where: { id },
+      data: {
+        approvers: {
+          disconnect: { id: approverId },
+        },
+      },
     });
 
     // Auditoría
@@ -400,12 +405,12 @@ export const removeApprover = async (req: Request, res: Response) => {
       data: {
         userId,
         action: 'REMOVE_SECTOR_APPROVER',
-        entity: 'SectorApprover',
-        entityId: assignment.id,
-        oldData: {
+        entity: 'Sector',
+        entityId: id,
+        changes: JSON.stringify({
           sectorId: id,
           approverId,
-        },
+        }),
       },
     });
 
