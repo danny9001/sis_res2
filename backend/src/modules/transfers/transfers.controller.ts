@@ -44,7 +44,6 @@ export const transferReservation = async (req: Request, res: Response) => {
         sector: true,
         event: true,
         relatorMain: true,
-        relatorSale: true,
       },
     });
     
@@ -138,16 +137,18 @@ async function transferToNewSector(
       action: 'TRANSFER_SECTOR',
       entity: 'Reservation',
       entityId: original.id,
-      reservationId: original.id,
-      oldData: {
-        sectorId: original.sectorId,
-        sectorName: original.sector.name,
-      },
-      newData: {
-        sectorId: data.newSectorId,
-        sectorName: newSector.name,
-        reason: data.reason,
-      },
+      changes: JSON.stringify({
+        reservationId: original.id,
+        oldData: {
+          sectorId: original.sectorId,
+          sectorName: original.sector.name,
+        },
+        newData: {
+          sectorId: data.newSectorId,
+          sectorName: newSector.name,
+          reason: data.reason,
+        },
+      }),
     },
   });
   
@@ -157,16 +158,17 @@ async function transferToNewSector(
     newStatus = ReservationStatus.PENDING;
     
     // Crear nueva aprobación
-    const approvers = await prisma.sectorApprover.findMany({
-      where: { sectorId: newSector.id },
+    const sectorWithApprovers = await prisma.sector.findUnique({
+      where: { id: newSector.id },
+      include: { approvers: true },
     });
-    
-    if (approvers.length > 0) {
+
+    if (sectorWithApprovers && sectorWithApprovers.approvers.length > 0) {
       await prisma.approval.create({
         data: {
           reservationId: original.id,
-          approverId: approvers[0].userId,
-          status: 'PENDING',
+          approverId: sectorWithApprovers.approvers[0].id,
+          approved: false,
           comments: `Transferido desde ${original.sector.name}. Razón: ${data.reason}`,
         },
       });
@@ -179,7 +181,7 @@ async function transferToNewSector(
     data: {
       sectorId: data.newSectorId,
       status: newStatus,
-      notes: `${original.notes || ''}\n\n[TRANSFERENCIA] De ${original.sector.name} a ${newSector.name}. Razón: ${data.reason}`,
+      observations: `${original.observations || ''}\n\n[TRANSFERENCIA] De ${original.sector.name} a ${newSector.name}. Razón: ${data.reason}`,
     },
     include: {
       guests: true,
@@ -212,20 +214,10 @@ async function transferToNewEvent(
   
   const newEvent = await prisma.event.findUnique({
     where: { id: data.newEventId },
-    include: {
-      sectors: {
-        where: { sectorId: original.sectorId },
-      },
-    },
   });
-  
+
   if (!newEvent || !newEvent.active) {
     throw new Error('Evento no válido');
-  }
-  
-  // Verificar que el sector esté disponible en el nuevo evento
-  if (newEvent.sectors.length === 0) {
-    throw new Error('El sector no está disponible en el nuevo evento');
   }
   
   // Crear auditoría
@@ -235,18 +227,20 @@ async function transferToNewEvent(
       action: 'TRANSFER_EVENT',
       entity: 'Reservation',
       entityId: original.id,
-      reservationId: original.id,
-      oldData: {
-        eventId: original.eventId,
-        eventName: original.event.name,
-        eventDate: original.event.eventDate,
-      },
-      newData: {
-        eventId: data.newEventId,
-        eventName: newEvent.name,
-        eventDate: newEvent.eventDate,
-        reason: data.reason,
-      },
+      changes: JSON.stringify({
+        reservationId: original.id,
+        oldData: {
+          eventId: original.eventId,
+          eventName: original.event.name,
+          eventDate: original.event.eventDate,
+        },
+        newData: {
+          eventId: data.newEventId,
+          eventName: newEvent.name,
+          eventDate: newEvent.eventDate,
+          reason: data.reason,
+        },
+      }),
     },
   });
   
@@ -271,7 +265,7 @@ async function transferToNewEvent(
     data: {
       eventId: data.newEventId,
       status: ReservationStatus.PENDING, // Requiere nueva aprobación
-      notes: `${original.notes || ''}\n\n[TRANSFERENCIA] De evento "${original.event.name}" a "${newEvent.name}". Razón: ${data.reason}`,
+      observations: `${original.observations || ''}\n\n[TRANSFERENCIA] De evento "${original.event.name}" a "${newEvent.name}". Razón: ${data.reason}`,
     },
     include: {
       guests: true,
@@ -318,16 +312,18 @@ async function transferToNewRelator(
       action: 'TRANSFER_RELATOR',
       entity: 'Reservation',
       entityId: original.id,
-      reservationId: original.id,
-      oldData: {
-        relatorMainId: original.relatorMainId,
-        relatorName: original.relatorMain.name,
-      },
-      newData: {
-        relatorMainId: data.newRelatorId,
-        relatorName: newRelator.name,
-        reason: data.reason,
-      },
+      changes: JSON.stringify({
+        reservationId: original.id,
+        oldData: {
+          relatorMainId: original.relatorMainId,
+          relatorName: original.relatorMain.name,
+        },
+        newData: {
+          relatorMainId: data.newRelatorId,
+          relatorName: newRelator.name,
+          reason: data.reason,
+        },
+      }),
     },
   });
   
@@ -336,7 +332,7 @@ async function transferToNewRelator(
     where: { id: original.id },
     data: {
       relatorMainId: data.newRelatorId,
-      notes: `${original.notes || ''}\n\n[TRANSFERENCIA] De relacionador "${original.relatorMain.name}" a "${newRelator.name}". Razón: ${data.reason}`,
+      observations: `${original.observations || ''}\n\n[TRANSFERENCIA] De relacionador "${original.relatorMain.name}" a "${newRelator.name}". Razón: ${data.reason}`,
     },
     include: {
       guests: true,
@@ -391,14 +387,16 @@ async function changeTableType(
       action: 'CHANGE_TABLE_TYPE',
       entity: 'Reservation',
       entityId: original.id,
-      reservationId: original.id,
-      oldData: {
-        tableType: original.tableType,
-      },
-      newData: {
-        tableType: data.newTableType,
-        reason: data.reason,
-      },
+      changes: JSON.stringify({
+        reservationId: original.id,
+        oldData: {
+          tableType: original.tableType,
+        },
+        newData: {
+          tableType: data.newTableType,
+          reason: data.reason,
+        },
+      }),
     },
   });
   
@@ -407,7 +405,7 @@ async function changeTableType(
     where: { id: original.id },
     data: {
       tableType: data.newTableType,
-      notes: `${original.notes || ''}\n\n[CAMBIO] Tipo de mesa de ${original.tableType} a ${data.newTableType}. Razón: ${data.reason}`,
+      observations: `${original.observations || ''}\n\n[CAMBIO] Tipo de mesa de ${original.tableType} a ${data.newTableType}. Razón: ${data.reason}`,
     },
     include: {
       guests: true,
@@ -474,16 +472,18 @@ async function mergeReservations(
       action: 'MERGE_RESERVATIONS',
       entity: 'Reservation',
       entityId: original.id,
-      reservationId: original.id,
-      oldData: {
+      changes: JSON.stringify({
         reservationId: original.id,
-        guestCount: original.guests.length,
-      },
-      newData: {
-        mergedIntoId: data.mergeWithReservationId,
-        totalGuests: totalGuests,
-        reason: data.reason,
-      },
+        oldData: {
+          reservationId: original.id,
+          guestCount: original.guests.length,
+        },
+        newData: {
+          mergedIntoId: data.mergeWithReservationId,
+          totalGuests: totalGuests,
+          reason: data.reason,
+        },
+      }),
     },
   });
   
@@ -498,15 +498,15 @@ async function mergeReservations(
     where: { id: original.id },
     data: {
       status: ReservationStatus.CANCELLED,
-      notes: `${original.notes || ''}\n\n[FUSIONADA] Fusionada con reserva #${targetReservation.id}. Razón: ${data.reason}`,
+      observations: `${original.observations || ''}\n\n[FUSIONADA] Fusionada con reserva #${targetReservation.id}. Razón: ${data.reason}`,
     },
   });
-  
-  // Actualizar notas de reserva destino
+
+  // Actualizar observaciones de reserva destino
   const updatedTarget = await prisma.reservation.update({
     where: { id: data.mergeWithReservationId },
     data: {
-      notes: `${targetReservation.notes || ''}\n\n[FUSIÓN] Recibió ${original.guests.length} invitados de reserva #${original.id}`,
+      observations: `${targetReservation.observations || ''}\n\n[FUSIÓN] Recibió ${original.guests.length} invitados de reserva #${original.id}`,
     },
     include: { guests: true },
   });
@@ -551,14 +551,12 @@ async function splitReservation(
       eventId: original.eventId,
       sectorId: original.sectorId,
       tableType: original.tableType,
-      tableClass: original.tableClass,
       paymentType: original.paymentType,
       paymentAmount: 0, // Se debe configurar manualmente
       relatorMainId: original.relatorMainId,
-      relatorSaleId: original.relatorSaleId,
       responsibleName: data.newResponsibleName || original.responsibleName,
       status: ReservationStatus.PENDING,
-      notes: `[DIVISIÓN] Creada desde reserva #${original.id}. Razón: ${data.reason}`,
+      observations: `[DIVISIÓN] Creada desde reserva #${original.id}. Razón: ${data.reason}`,
     },
   });
   
@@ -569,16 +567,18 @@ async function splitReservation(
       action: 'SPLIT_RESERVATION',
       entity: 'Reservation',
       entityId: original.id,
-      reservationId: original.id,
-      oldData: {
-        guestCount: original.guests.length,
-      },
-      newData: {
-        newReservationId: newReservation.id,
-        splitGuestCount: guestsToSplit.length,
-        remainingGuestCount: original.guests.length - guestsToSplit.length,
-        reason: data.reason,
-      },
+      changes: JSON.stringify({
+        reservationId: original.id,
+        oldData: {
+          guestCount: original.guests.length,
+        },
+        newData: {
+          newReservationId: newReservation.id,
+          splitGuestCount: guestsToSplit.length,
+          remainingGuestCount: original.guests.length - guestsToSplit.length,
+          reason: data.reason,
+        },
+      }),
     },
   });
   
@@ -592,11 +592,11 @@ async function splitReservation(
     },
   });
   
-  // Actualizar notas de reserva original
+  // Actualizar observaciones de reserva original
   await prisma.reservation.update({
     where: { id: original.id },
     data: {
-      notes: `${original.notes || ''}\n\n[DIVISIÓN] ${guestsToSplit.length} invitados movidos a reserva #${newReservation.id}`,
+      observations: `${original.observations || ''}\n\n[DIVISIÓN] ${guestsToSplit.length} invitados movidos a reserva #${newReservation.id}`,
     },
   });
   
@@ -664,7 +664,8 @@ export const getTransferHistory = async (req: Request, res: Response) => {
     
     const history = await prisma.auditLog.findMany({
       where: {
-        reservationId,
+        entity: 'Reservation',
+        entityId: reservationId,
         action: {
           in: [
             'TRANSFER_SECTOR',

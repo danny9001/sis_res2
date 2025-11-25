@@ -77,7 +77,7 @@ export const createEvent = async (req: Request, res: Response) => {
         action: 'CREATE_EVENT',
         entity: 'Event',
         entityId: event.id,
-        newData: data,
+        changes: JSON.stringify({ newData: data }),
       },
     });
 
@@ -114,8 +114,7 @@ export const updateEvent = async (req: Request, res: Response) => {
         action: 'UPDATE_EVENT',
         entity: 'Event',
         entityId: id,
-        oldData: existing,
-        newData: data,
+        changes: JSON.stringify({ oldData: existing, newData: data }),
       },
     });
 
@@ -155,7 +154,7 @@ export const deleteEvent = async (req: Request, res: Response) => {
         action: 'DELETE_EVENT',
         entity: 'Event',
         entityId: id,
-        oldData: event,
+        changes: JSON.stringify({ oldData: event }),
       },
     });
 

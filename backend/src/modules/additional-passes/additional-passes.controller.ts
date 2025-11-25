@@ -12,9 +12,8 @@ const prisma = new PrismaClient();
 const createPassSchema = z.object({
   reservationId: z.string().uuid(),
   guestName: z.string().min(2),
-  guestCi: z.string().min(5),
+  guestCI: z.string().min(5),
   guestPhone: z.string().optional(),
-  guestEmail: z.string().email().optional(),
   reason: z.string().min(10, 'La razón debe tener al menos 10 caracteres'),
 });
 
@@ -90,12 +89,11 @@ export const createAdditionalPass = async (req: Request, res: Response) => {
       data: {
         reservationId: data.reservationId,
         guestName: data.guestName,
-        guestCi: data.guestCi,
+        guestCI: data.guestCI,
         guestPhone: data.guestPhone,
-        guestEmail: data.guestEmail,
         qrCode,
         reason: data.reason,
-        approvedBy: userId,
+        createdById: userId,
         status: 'ACTIVE',
       },
       include: {
@@ -105,7 +103,7 @@ export const createAdditionalPass = async (req: Request, res: Response) => {
             sector: true,
           },
         },
-        approvedByUser: {
+        createdBy: {
           select: {
             name: true,
             email: true,
@@ -121,12 +119,12 @@ export const createAdditionalPass = async (req: Request, res: Response) => {
         action: 'CREATE_ADDITIONAL_PASS',
         entity: 'AdditionalPass',
         entityId: additionalPass.id,
-        reservationId: reservation.id,
-        newData: {
+        changes: JSON.stringify({
           guestName: data.guestName,
-          guestCi: data.guestCi,
+          guestCI: data.guestCI,
           reason: data.reason,
-        },
+          reservationId: reservation.id,
+        }),
       },
     });
 
@@ -214,13 +212,7 @@ export const getAdditionalPasses = async (req: Request, res: Response) => {
             },
           },
         },
-        approvedByUser: {
-          select: {
-            name: true,
-            email: true,
-          },
-        },
-        validatedBy: {
+        createdBy: {
           select: {
             name: true,
             email: true,
@@ -264,8 +256,7 @@ export const getAdditionalPass = async (req: Request, res: Response) => {
             },
           },
         },
-        approvedByUser: true,
-        validatedBy: true,
+        createdBy: true,
       },
     });
 
@@ -326,9 +317,12 @@ export const revokeAdditionalPass = async (req: Request, res: Response) => {
         action: 'REVOKE_ADDITIONAL_PASS',
         entity: 'AdditionalPass',
         entityId: id,
-        reservationId: pass.reservationId,
-        oldData: { status: pass.status },
-        newData: { status: 'REVOKED', reason },
+        changes: JSON.stringify({
+          reservationId: pass.reservationId,
+          oldStatus: pass.status,
+          newStatus: 'REVOKED',
+          reason,
+        }),
       },
     });
 
@@ -369,7 +363,7 @@ export const getPassQR = async (req: Request, res: Response) => {
       qrCode: pass.qrCode,
       qrImage,
       guestName: pass.guestName,
-      guestCi: pass.guestCi,
+      guestCI: pass.guestCI,
     });
   } catch (error) {
     console.error('Error al generar QR:', error);
@@ -390,12 +384,7 @@ export const getPassesByReservation = async (req: Request, res: Response) => {
         reservationId,
       },
       include: {
-        approvedByUser: {
-          select: {
-            name: true,
-          },
-        },
-        validatedBy: {
+        createdBy: {
           select: {
             name: true,
           },

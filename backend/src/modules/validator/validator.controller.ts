@@ -104,7 +104,6 @@ export const validateQR = async (req: Request, res: Response) => {
         data: {
           qrValidated: true,
           validatedAt: new Date(),
-          validatedById: validatorId,
           status: 'USED',
         },
       });
@@ -125,11 +124,11 @@ export const validateQR = async (req: Request, res: Response) => {
         action: isAdditionalPass ? 'VALIDATE_ADDITIONAL_PASS' : 'VALIDATE_QR',
         entity: isAdditionalPass ? 'AdditionalPass' : 'Guest',
         entityId: isAdditionalPass ? additionalPass!.id : guest!.id,
-        reservationId: reservation.id,
-        newData: {
+        changes: JSON.stringify({
+          reservationId: reservation.id,
           qrCode,
           validatedAt: new Date(),
-        },
+        }),
       },
     });
 
@@ -139,7 +138,7 @@ export const validateQR = async (req: Request, res: Response) => {
       message: '✅ Acceso permitido',
       guest: {
         name: isAdditionalPass ? additionalPass!.guestName : guest!.name,
-        ci: isAdditionalPass ? additionalPass!.guestCi : guest!.ci,
+        ci: isAdditionalPass ? additionalPass!.guestCI : guest!.ci,
         isAdditionalPass,
       },
       reservation: {
@@ -189,7 +188,6 @@ export const getValidatorStats = async (req: Request, res: Response) => {
     const totalAdditionalValidated = await prisma.additionalPass.count({
       where: {
         qrValidated: true,
-        validatedById: validatorId,
         ...where,
       },
     });
@@ -292,7 +290,7 @@ export const getReservationsForValidator = async (req: Request, res: Response) =
           select: {
             id: true,
             guestName: true,
-            guestCi: true,
+            guestCI: true,
             qrValidated: true,
             validatedAt: true,
             reason: true,
@@ -357,14 +355,6 @@ export const getReservationDetails = async (req: Request, res: Response) => {
           where: {
             status: { not: 'REVOKED' },
           },
-          include: {
-            approvedByUser: {
-              select: {
-                name: true,
-                email: true,
-              },
-            },
-          },
           orderBy: { createdAt: 'desc' },
         },
         relatorMain: {
@@ -372,12 +362,6 @@ export const getReservationDetails = async (req: Request, res: Response) => {
             name: true,
             email: true,
             phone: true,
-          },
-        },
-        relatorSale: {
-          select: {
-            name: true,
-            email: true,
           },
         },
       },
@@ -446,7 +430,7 @@ export const searchGuest = async (req: Request, res: Response) => {
         status: 'ACTIVE',
         OR: [
           { guestName: { contains: query, mode: 'insensitive' } },
-          { guestCi: { contains: query, mode: 'insensitive' } },
+          { guestCI: { contains: query, mode: 'insensitive' } },
         ],
       },
       include: {

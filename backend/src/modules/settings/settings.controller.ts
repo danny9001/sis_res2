@@ -13,7 +13,6 @@ const settingsSchema = z.object({
   faviconUrl: z.string().url().optional().nullable(),
   primaryColor: z.string().regex(/^#[0-9A-F]{6}$/i).optional(),
   secondaryColor: z.string().regex(/^#[0-9A-F]{6}$/i).optional(),
-  accentColor: z.string().regex(/^#[0-9A-F]{6}$/i).optional(),
   contactEmail: z.string().email().optional().nullable(),
   contactPhone: z.string().optional().nullable(),
   supportUrl: z.string().url().optional().nullable(),
@@ -44,7 +43,6 @@ export const getSettings = async (req: Request, res: Response) => {
           siteName: 'Sistema de Reservas',
           primaryColor: '#3B82F6',
           secondaryColor: '#10B981',
-          accentColor: '#F59E0B',
         },
       });
     }
@@ -83,7 +81,7 @@ export const updateSettings = async (req: Request, res: Response) => {
         action: 'UPDATE_SETTINGS',
         entity: 'SiteSettings',
         entityId: settings.id,
-        newData: data,
+        changes: JSON.stringify({ newData: data }),
       },
     });
     
@@ -110,7 +108,6 @@ export const getPublicSettings = async (req: Request, res: Response) => {
         faviconUrl: true,
         primaryColor: true,
         secondaryColor: true,
-        accentColor: true,
         contactEmail: true,
         contactPhone: true,
         supportUrl: true,
@@ -122,15 +119,116 @@ export const getPublicSettings = async (req: Request, res: Response) => {
         welcomeMessage: true,
       },
     });
-    
+
     res.json(settings || {
       siteName: 'Sistema de Reservas',
       primaryColor: '#3B82F6',
       secondaryColor: '#10B981',
-      accentColor: '#F59E0B',
     });
   } catch (error) {
     console.error('Error al obtener configuración pública:', error);
     res.status(500).json({ error: 'Error al obtener configuración' });
+  }
+};
+
+/**
+ * Subir logo
+ * POST /api/settings/logo
+ */
+export const uploadLogo = async (req: Request, res: Response) => {
+  try {
+    // TODO: Implement file upload logic with multer
+    const file = req.file;
+
+    if (!file) {
+      return res.status(400).json({ error: 'No file provided' });
+    }
+
+    const logoUrl = `/uploads/${file.filename}`;
+
+    const settings = await prisma.siteSettings.findFirst();
+    if (settings) {
+      await prisma.siteSettings.update({
+        where: { id: settings.id },
+        data: { logoUrl },
+      });
+    }
+
+    res.json({ logoUrl });
+  } catch (error) {
+    console.error('Error uploading logo:', error);
+    res.status(500).json({ error: 'Error uploading logo' });
+  }
+};
+
+/**
+ * Subir favicon
+ * POST /api/settings/favicon
+ */
+export const uploadFavicon = async (req: Request, res: Response) => {
+  try {
+    // TODO: Implement file upload logic with multer
+    const file = req.file;
+
+    if (!file) {
+      return res.status(400).json({ error: 'No file provided' });
+    }
+
+    const faviconUrl = `/uploads/${file.filename}`;
+
+    const settings = await prisma.siteSettings.findFirst();
+    if (settings) {
+      await prisma.siteSettings.update({
+        where: { id: settings.id },
+        data: { faviconUrl },
+      });
+    }
+
+    res.json({ faviconUrl });
+  } catch (error) {
+    console.error('Error uploading favicon:', error);
+    res.status(500).json({ error: 'Error uploading favicon' });
+  }
+};
+
+/**
+ * Eliminar logo
+ * DELETE /api/settings/logo
+ */
+export const deleteLogo = async (req: Request, res: Response) => {
+  try {
+    const settings = await prisma.siteSettings.findFirst();
+    if (settings) {
+      await prisma.siteSettings.update({
+        where: { id: settings.id },
+        data: { logoUrl: null },
+      });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting logo:', error);
+    res.status(500).json({ error: 'Error deleting logo' });
+  }
+};
+
+/**
+ * Eliminar favicon
+ * DELETE /api/settings/favicon
+ */
+export const deleteFavicon = async (req: Request, res: Response) => {
+  try {
+    const settings = await prisma.siteSettings.findFirst();
+    if (settings) {
+      await prisma.siteSettings.update({
+        where: { id: settings.id },
+        data: { faviconUrl: null },
+      });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting favicon:', error);
+    res.status(500).json({ error: 'Error deleting favicon' });
   }
 };

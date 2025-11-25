@@ -113,7 +113,7 @@ export const createUser = async (req: Request, res: Response) => {
         action: 'CREATE_USER',
         entity: 'User',
         entityId: user.id,
-        newData: { ...data, password: '[REDACTED]' },
+        changes: JSON.stringify({ newData: { ...data, password: '[REDACTED]' } }),
       },
     });
 
@@ -159,8 +159,10 @@ export const updateUser = async (req: Request, res: Response) => {
         action: 'UPDATE_USER',
         entity: 'User',
         entityId: id,
-        oldData: { ...existing, password: '[REDACTED]' },
-        newData: { ...data, password: '[REDACTED]' },
+        changes: JSON.stringify({
+          oldData: { ...existing, password: '[REDACTED]' },
+          newData: { ...data, password: '[REDACTED]' },
+        }),
       },
     });
 
@@ -194,7 +196,7 @@ export const deleteUser = async (req: Request, res: Response) => {
         action: 'DELETE_USER',
         entity: 'User',
         entityId: id,
-        oldData: { ...user, password: '[REDACTED]' },
+        changes: JSON.stringify({ oldData: { ...user, password: '[REDACTED]' } }),
       },
     });
 
