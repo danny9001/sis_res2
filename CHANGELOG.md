@@ -1,282 +1,190 @@
-# 📋 CHANGELOG
+# Changelog
 
-Todos los cambios notables de este proyecto serán documentados en este archivo.
+Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/),
 y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
----
+## [1.1.0] - 2025-01-21
 
-## [2.1.0] - 2024-11-25
+### 🔴 Crítico - REQUIERE ACCIÓN
 
-### 🎉 NUEVA VERSIÓN MAYOR - v2.1
+#### Fixed
+- **[BREAKING]** Corregido typo en `frontend/src/contexts/AuthContext.tsx` - `AuthContextContextType` → `AuthContextType`
+- **[BREAKING]** Implementado PrismaClient singleton compartido para prevenir agotamiento de conexiones a BD
+  - Nuevo archivo: `backend/src/utils/prisma.ts`
+  - Actualizado: Todos los controladores (9 archivos)
+- **[BREAKING]** Agregada verificación de variables de entorno críticas al inicio del servidor
+  - Nuevo archivo: `backend/src/utils/env.ts`
+  - El servidor NO iniciará si faltan variables requeridas
+  - `JWT_REFRESH_SECRET` ahora es **REQUERIDO**
 
-### ✨ Agregado
+### 🟠 Seguridad
 
-#### Nuevos Módulos
+#### Added
+- **Rate Limiting** implementado en endpoints
+  - Nuevo archivo: `backend/src/middleware/rateLimiter.ts`
+  - Rate limiter general: 100 req/15min
+  - Rate limiter de auth: 5 intentos/15min
+  - Rate limiter de creación: 10 ops/min
+  - Rate limiter sensible: 20 ops/min
 
-**Personalización del Sitio**
-- Subida de logo personalizado
-- Configuración de favicon
-- Personalización de colores del tema
-- Información de contacto configurable
-- Redes sociales (Facebook, Instagram, Twitter, WhatsApp)
-- Términos y condiciones personalizados
-- Restricciones de reservas configurables
-- Endpoint público para configuración
+- **Validación de entrada con Zod** en todos los endpoints
+  - Nuevo archivo: `backend/src/middleware/validation.ts`
+  - 12+ esquemas de validación
+  - Protección contra inyección de datos maliciosos
 
-**Rol Validador (Porteros)**
-- Nuevo rol `VALIDATOR` en el sistema
-- Escaneo de códigos QR en la entrada
-- Validación manual de códigos
-- Vista de solo lectura de reservas
-- Búsqueda de invitados por nombre o CI
-- Estadísticas de validación en tiempo real
-- Dashboard para validadores
+- **Autenticación JWT en WebSocket**
+  - WebSocket ahora requiere token válido para conectar
+  - Actualizado: `backend/src/server.ts:49-80`
 
-**Pases Adicionales**
-- Generación de invitados extras para mesas
-- Validación automática de capacidad
-- QR únicos para cada pase
-- Estados: ACTIVE, USED, REVOKED
-- Razón obligatoria para trazabilidad
-- Email automático al relacionador
-- Posibilidad de revocar pases
-- Integración con sistema de validación
+- **Transacciones en operaciones críticas**
+  - Creación de reservas ahora usa `prisma.$transaction()`
+  - Rollback automático en caso de error
+  - Actualizado: `backend/src/modules/reservations/reservations.controller.ts:200-295`
 
-**Analytics Avanzado**
-- Dashboard completo con estadísticas generales
-- Analíticas por evento (asistencia, ingresos)
-- Rendimiento de relacionadores
-- Analíticas por sector (ocupación)
-- Ingresos detallados por tipo de pago
-- Tendencias temporales
-- Exportación a CSV
+#### Changed
+- JWT token expiration reducido de 24h a 1h (más seguro)
+- Todos los secrets deben tener mínimo 32 caracteres (advertencia en logs)
 
-**Gestión de Sectores**
-- CRUD completo de sectores
-- Asignación de aprobadores por sector
-- Validación de capacidad
-- Soft delete
-- Estadísticas por sector
-- Búsqueda y filtros avanzados
-- Código único por sector
+### 🟡 Mejoras de Código
 
-**Gestión de Eventos**
-- CRUD completo de eventos
-- Filtro de próximos eventos
-- Capacidad máxima configurable
-- Eventos activos/inactivos
-- Soft delete
-- Asociación con reservas
+#### Added
+- **Winston Logger estructurado**
+  - Nuevo archivo: `backend/src/utils/logger.ts`
+  - Logs a archivo en producción (`logs/error.log`, `logs/combined.log`)
+  - Logs coloreados en desarrollo
+  - Integrado con Morgan para request logging
 
-**Gestión de Usuarios**
-- CRUD completo de usuarios
-- Soporte para 4 roles (ADMIN, APPROVER, RELATOR, VALIDATOR)
-- Cambio de contraseña con hash bcrypt
-- Activar/desactivar usuarios
-- Búsqueda por nombre y email
-- Validación de datos con Zod
+- **Refresh Token automático en frontend**
+  - Actualizado: `frontend/src/services/api.ts`
+  - Interceptor de Axios que refresca tokens expirados
+  - Cola de peticiones fallidas
+  - Mejor UX: usuarios no son expulsados abruptamente
 
-**Sistema de Auditoría**
-- Log automático de todas las acciones
-- Filtros avanzados (usuario, entidad, acción, fecha)
-- Estadísticas de uso del sistema
-- Historial completo por entidad
-- Paginación de resultados
-- Identificación de usuarios más activos
+- **Tipos TypeScript específicos**
+  - Nuevo archivo: `backend/src/types/index.ts`
+  - Eliminados tipos `any` en archivos críticos
+  - Interfaces para: `JwtPayload`, `ReservationWhereInput`, `ApprovalWhereInput`, `GuestCreateInput`, etc.
 
-#### Nuevos Endpoints
+#### Changed
+- **Manejo de errores mejorado en emailService**
+  - Try-catch en todas las funciones de email
+  - Logging estructurado de errores
+  - Errores de email no rompen flujo principal
+  - Actualizado: `backend/src/utils/emailService.ts`
 
-**Settings**
-- `GET /api/settings/public` - Configuración pública
-- `GET /api/settings` - Ver configuración
-- `PUT /api/settings` - Actualizar configuración
-- `POST /api/settings/logo` - Subir logo
-- `POST /api/settings/favicon` - Subir favicon
-- `DELETE /api/settings/logo` - Eliminar logo
-
-**Validator**
-- `POST /api/validator/scan` - Validar QR
-- `GET /api/validator/stats` - Estadísticas
-- `GET /api/validator/reservations` - Ver reservas
-- `GET /api/validator/reservation/:id` - Detalles
-- `GET /api/validator/search/:query` - Buscar invitado
-
-**Additional Passes**
-- `POST /api/additional-passes` - Crear pase
-- `GET /api/additional-passes` - Listar pases
-- `GET /api/additional-passes/:id` - Detalles
-- `GET /api/additional-passes/:id/qr` - Obtener QR
-- `POST /api/additional-passes/:id/revoke` - Revocar
-- `GET /api/additional-passes/reservation/:id` - Por reserva
-- `GET /api/additional-passes/stats/overview` - Estadísticas
-
-**Analytics**
-- `GET /api/analytics/dashboard` - Dashboard
-- `GET /api/analytics/events` - Por evento
-- `GET /api/analytics/relators` - Relacionadores
-- `GET /api/analytics/sectors` - Por sector
-- `GET /api/analytics/revenue` - Ingresos
-- `GET /api/analytics/export` - Exportar CSV
-
-**Sectors**
-- `GET /api/sectors` - Listar
-- `POST /api/sectors` - Crear
-- `GET /api/sectors/:id` - Ver
-- `PUT /api/sectors/:id` - Actualizar
-- `DELETE /api/sectors/:id` - Eliminar
-- `POST /api/sectors/:id/approvers` - Asignar aprobador
-- `DELETE /api/sectors/:id/approvers/:userId` - Remover aprobador
-- `GET /api/sectors/:id/stats` - Estadísticas
-
-**Events**
-- `GET /api/events` - Listar
-- `POST /api/events` - Crear
-- `GET /api/events/:id` - Ver
-- `PUT /api/events/:id` - Actualizar
-- `DELETE /api/events/:id` - Eliminar
-
-**Users**
-- `GET /api/users` - Listar (ADMIN)
-- `POST /api/users` - Crear (ADMIN)
-- `GET /api/users/:id` - Ver (ADMIN)
-- `PUT /api/users/:id` - Actualizar (ADMIN)
-- `DELETE /api/users/:id` - Eliminar (ADMIN)
-
-**Audit**
-- `GET /api/audit` - Listar logs
-- `GET /api/audit/stats` - Estadísticas
-- `GET /api/audit/:id` - Ver log
-- `GET /api/audit/entity/:entity/:entityId` - Historial
-
-#### Nuevas Tablas en Base de Datos
-
-- `SiteSettings` - Configuración del sitio
-- `AdditionalPass` - Pases adicionales
-- Enum `UserRole` extendido con `VALIDATOR`
-
-#### Nuevas Dependencias
-
-**Backend**
-- `multer` - Upload de archivos
-- `html5-qrcode` - Escaneo de QR
-
-**Frontend**
-- `html5-qrcode` - Scanner component
-
-### 🔧 Mejorado
-
-- **Server.ts** - Reorganizado con todos los módulos
-- **Package.json** - Actualizado a v2.1.0
-- **README.md** - Documentación completa actualizada
-- **Health Check** - Ahora muestra todos los módulos cargados
-- **Sistema de Permisos** - Extendido para nuevos roles
-- **Auditoría** - Ahora registra todas las acciones de módulos nuevos
-- **WebSockets** - Mejorado para nuevos eventos
+- **Error handler mejorado**
+  - Usa winston logger en lugar de console.error
+  - Logging contextual (URL, método, IP, user agent)
+  - Stack traces solo en desarrollo
+  - Actualizado: `backend/src/middleware/errorHandler.ts`
 
 ### 📚 Documentación
 
-- Guía completa de instalación
-- Documentación de API actualizada
-- Guía de cada módulo nuevo
-- Ejemplos de uso
-- Troubleshooting extendido
+#### Added
+- `Documentation/TESTING_GUIDE.md` - Guía completa de testing
+- `Documentation/MIGRATION_GUIDE.md` - Guía de migración v1.0 → v1.1
+- `CHANGELOG.md` - Este archivo
+- `.env.example` actualizado con comentarios detallados (backend y frontend)
 
-### 🔒 Seguridad
+### 🔧 Archivos Nuevos
 
-- Validación de archivos subidos (logo/favicon)
-- Límite de tamaño de archivos (5MB)
-- Sanitización de datos de entrada
-- Control de acceso por rol reforzado
+```
+backend/src/middleware/rateLimiter.ts    # Rate limiting
+backend/src/middleware/validation.ts     # Validación Zod
+backend/src/types/index.ts               # Tipos TypeScript
+backend/src/utils/env.ts                 # Validación de env vars
+backend/src/utils/logger.ts              # Winston logger
+backend/src/utils/prisma.ts              # Singleton de PrismaClient
+Documentation/TESTING_GUIDE.md           # Guía de testing
+Documentation/MIGRATION_GUIDE.md         # Guía de migración
+CHANGELOG.md                             # Este archivo
+```
 
----
+### 📊 Estadísticas
 
-## [2.0.0] - 2024-11-01
+- **21 archivos modificados**
+- **637 líneas agregadas**
+- **137 líneas eliminadas**
+- **6 archivos nuevos creados**
 
-### ✨ Agregado
+### ⚠️ Breaking Changes
 
-#### Sistema Base
+1. **JWT_REFRESH_SECRET requerido**: El servidor no iniciará sin esta variable
+2. **WebSocket requiere autenticación**: Conexiones sin token serán rechazadas
+3. **JWT expira en 1h**: Cambio de 24h a 1h (configurable)
+4. **Variables de entorno validadas**: El servidor no iniciará si faltan variables críticas
 
-**Autenticación**
-- Login con email y contraseña
-- JWT con refresh tokens
-- Registro de usuarios
-- Recuperación de contraseña
+### 🔄 Migración
 
-**Reservas**
-- Crear reservas para eventos
-- Tipos de mesa (JET-15, FLY-10, etc.)
-- Asignación de sectores
-- Invitados por mesa
-- Códigos QR únicos
+Ver `Documentation/MIGRATION_GUIDE.md` para instrucciones detalladas.
 
-**Aprobaciones**
-- Sistema multinivel
-- Estados: PENDING, APPROVED, REJECTED
-- Notificaciones automáticas
-- Historial de aprobaciones
+**Pasos principales**:
+1. Agregar `JWT_REFRESH_SECRET` al `.env`
+2. Actualizar código: `git pull`
+3. Reinstalar dependencias: `npm install`
+4. Verificar variables: Todas las marcadas como REQUERIDAS en `.env.example`
+5. Reiniciar servidor
 
-**Notificaciones**
-- Emails automáticos
-- Notificaciones en tiempo real
-- WebSockets
+### 🧪 Testing
 
-**QR**
-- Generación automática
-- Validación en entrada
-- Historial de escaneos
+Ver `Documentation/TESTING_GUIDE.md` para casos de test completos.
 
-#### Roles Iniciales
-- ADMIN - Administrador total
-- APPROVER - Aprobador de reservas
-- RELATOR - Creador de reservas
-
-### 🔧 Configuración Inicial
-
-- PostgreSQL como base de datos
-- Prisma ORM
-- Express.js backend
-- React frontend
-- TailwindCSS
+**Tests críticos**:
+- Rate limiting funciona
+- Refresh token automático
+- Transacciones en BD
+- Autenticación WebSocket
+- Validación Zod
 
 ---
 
-## [1.0.0] - 2024-10-01
+## [1.0.0] - 2025-01-15
 
-### ✨ Inicial
+### Added
+- Sistema completo de reservas para eventos
+- Autenticación con JWT
+- 3 roles de usuario: ADMIN, APPROVER, RELATOR
+- Sistema de aprobaciones multinivel
+- Generación de códigos QR para invitados
+- Envío de emails con QR codes
+- Dashboard con analytics
+- Audit trail completo
+- WebSocket para notificaciones en tiempo real
+- Frontend React con TypeScript
+- Backend Node.js/Express con Prisma ORM
+- Base de datos PostgreSQL
 
-- Primera versión del sistema
-- Funcionalidades básicas de reservas
-- Sistema de autenticación simple
-
----
-
-## [Unreleased]
-
-### 🚀 Próximamente en v2.2
-
-- Reportes PDF personalizados
-- Integración con pasarelas de pago
-- Sistema de puntos y recompensas
-- Notificaciones push
-- Mejoras en dashboard
-
----
-
-## Tipos de Cambios
-
-- **✨ Agregado** - Para nuevas características
-- **🔧 Mejorado** - Para cambios en funcionalidad existente
-- **⚠️ Deprecado** - Para características que serán eliminadas
-- **❌ Eliminado** - Para características eliminadas
-- **🐛 Corregido** - Para corrección de bugs
-- **🔒 Seguridad** - Para parches de seguridad
+### Features Principales
+- **Auth**: Login/Logout con JWT
+- **Reservas**: CRUD completo con validaciones
+- **Aprobaciones**: Flujo de aprobación por sectores
+- **Invitados**: Gestión con QR codes únicos
+- **Eventos**: Gestión de eventos y sectores
+- **Analytics**: Dashboard con métricas
+- **Audit**: Registro de todas las acciones
+- **Notificaciones**: WebSocket en tiempo real
+- **Email**: Envío automático de confirmaciones
 
 ---
 
-## Enlaces
+## Formato
 
-- [2.1.0]: https://github.com/danny9001/sis_res2/releases/tag/v2.1.0
-- [2.0.0]: https://github.com/danny9001/sis_res2/releases/tag/v2.0.0
-- [1.0.0]: https://github.com/danny9001/sis_res2/releases/tag/v1.0.0
+### Tipos de cambios
+- `Added` - Nuevas funcionalidades
+- `Changed` - Cambios en funcionalidades existentes
+- `Deprecated` - Funcionalidades que se eliminarán pronto
+- `Removed` - Funcionalidades eliminadas
+- `Fixed` - Corrección de bugs
+- `Security` - Mejoras de seguridad
+
+### Niveles de severidad
+- 🔴 **Crítico** - Requiere acción inmediata, puede romper funcionalidad
+- 🟠 **Alto** - Importante, debe atenderse pronto
+- 🟡 **Medio** - Mejora recomendada
+- 🔵 **Bajo** - Mejora opcional
+- ⚪ **Info** - Cambio informativo sin impacto
+
+[1.1.0]: https://github.com/tuusuario/sis_res2/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/tuusuario/sis_res2/releases/tag/v1.0.0
