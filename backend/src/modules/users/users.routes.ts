@@ -1,21 +1,16 @@
+// backend/src/modules/users/users.routes.ts
 import { Router } from 'express';
 import { authenticate, authorize } from '../../middleware/auth';
-import {
-  getUsers,
-  getUserById,
-  createUser,
-  updateUser,
-  deleteUser
-} from './users.controller';
+import { getUsers, getUser, createUser, updateUser, deleteUser } from './users.controller';
 
 const router = Router();
-
 router.use(authenticate);
+router.use(authorize(['ADMIN']));
 
-router.get('/', authorize('ADMIN'), getUsers);
-router.get('/:id', getUserById);
-router.post('/', authorize('ADMIN'), createUser);
-router.put('/:id', authorize('ADMIN'), updateUser);
-router.delete('/:id', authorize('ADMIN'), deleteUser);
+router.get('/', getUsers);
+router.get('/:id', getUser);
+router.post('/', createUser);
+router.put('/:id', updateUser);
+router.delete('/:id', deleteUser);
 
 export default router;

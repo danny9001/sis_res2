@@ -1,20 +1,17 @@
 # Dependencies
-node_modules
+node_modules/
 package-lock.json
-yarn.lock
 
 # Build
-dist
-build
-.vite
+dist/
+build/
 
 # Environment
 .env
 .env.local
-.env.*.local
+.env.production
 
 # Logs
-logs
 *.log
 
 # OS
@@ -22,10 +19,8 @@ logs
 Thumbs.db
 
 # IDE
-.vscode
-.idea
+.vscode/
+.idea/
 *.swp
 *.swo
-
-# Testing
-coverage
+*~

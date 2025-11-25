@@ -1,7 +1,6 @@
 # Dependencies
 node_modules/
 package-lock.json
-yarn.lock
 
 # Build
 dist/
@@ -10,12 +9,15 @@ build/
 # Environment
 .env
 .env.local
-.env.*.local
+.env.production
+
+# Uploads
+uploads/*
+!uploads/.gitkeep
 
 # Logs
-logs/
 *.log
-npm-debug.log*
+logs/
 
 # OS
 .DS_Store
@@ -26,10 +28,7 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
-
-# Uploads
-uploads/
-!uploads/.gitkeep
+*~
 
 # Prisma
-prisma/migrations/*/migration.sql
+prisma/migrations/
