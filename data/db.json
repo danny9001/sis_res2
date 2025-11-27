@@ -1,0 +1,83 @@
+{
+  "users": [
+    {
+      "id": "1",
+      "name": "Admin User",
+      "username": "admin",
+      "password": "123",
+      "role": "admin"
+    },
+    {
+      "id": "2",
+      "name": "Promoter User",
+      "username": "promo",
+      "password": "123",
+      "role": "promoter"
+    },
+    {
+      "id": "3",
+      "name": "Approver User",
+      "username": "approve",
+      "password": "123",
+      "role": "approver"
+    }
+  ],
+  "tables": [
+    {
+      "id": "1",
+      "name": "Mesa 1",
+      "capacity": 4,
+      "status": "available",
+      "location": "Main Floor"
+    },
+    {
+      "id": "2",
+      "name": "Mesa 2",
+      "capacity": 4,
+      "status": "available",
+      "location": "Main Floor"
+    },
+    {
+      "id": "3",
+      "name": "VIP 1",
+      "capacity": 8,
+      "status": "available",
+      "location": "VIP Area"
+    }
+  ],
+  "clients": [
+    {
+      "id": "1",
+      "name": "Juan Perez",
+      "phone": "555-0101",
+      "isVip": false
+    },
+    {
+      "id": "2",
+      "name": "Maria Garcia",
+      "phone": "555-0102",
+      "isVip": true
+    }
+  ],
+  "reservations": [
+    {
+      "id": "e8emf",
+      "eventId": "n2xtw",
+      "clientId": "1",
+      "tableId": "2",
+      "date": "2025-11-26T17:57",
+      "status": "pending",
+      "createdBy": "1",
+      "createdAt": "2025-11-26T21:57:48.676Z"
+    }
+  ],
+  "events": [
+    {
+      "id": "n2xtw",
+      "name": "Ejemplo",
+      "date": "2025-11-26T17:57",
+      "totalTables": 5,
+      "status": "active"
+    }
+  ]
+}
